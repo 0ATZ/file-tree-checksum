@@ -18,11 +18,14 @@ class GeneratorBrake():
     def iter(self):
         while(True):
             if self.enable:
-                yield next(self.generator)
+                try:
+                    yield next(self.generator)
+                except:
+                    break
             else:
                 yield self.previous
 
-def sorted_walk(top, topdown=True, onerror=None, followlinks=False, reverse=False):
+def sorted_walk(top, topdown=True, onerror=None, followlinks=False, reverse=False, directory_level=0):
     """Note (JGH): This sorted walk is a modified version of the os.walk function.
             Normally, os.walk will recursively traverse the specified top level
             directory in an order determined by the file system implementation.
@@ -154,7 +157,7 @@ def sorted_walk(top, topdown=True, onerror=None, followlinks=False, reverse=Fals
 
     # Yield before recursion if going top down
     if topdown:
-        yield top, dirs, nondirs
+        yield top, dirs, nondirs, directory_level
 
         # Recurse into sub-directories
         for dirname in dirs:
@@ -164,10 +167,10 @@ def sorted_walk(top, topdown=True, onerror=None, followlinks=False, reverse=Fals
             # the caller can replace the directory entry during the "yield"
             # above.
             if followlinks or not islink(new_path):
-                yield from sorted_walk(new_path, topdown, onerror, followlinks, reverse)
+                yield from sorted_walk(new_path, topdown, onerror, followlinks, reverse, directory_level+1)
     else:
         # Recurse into sub-directories
         for new_path in walk_dirs:
-            yield from sorted_walk(new_path, topdown, onerror, followlinks, reverse)
+            yield from sorted_walk(new_path, topdown, onerror, followlinks, reverse, directory_level+1)
         # Yield after recursion if going bottom up
-        yield top, dirs, nondirs
+        yield top, dirs, nondirs, directory_level

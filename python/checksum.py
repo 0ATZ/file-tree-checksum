@@ -1,6 +1,7 @@
 from hashlib import sha1, sha224, sha256, sha384, sha512
 from itertools import zip_longest
 from os.path import join
+from typing import Tuple
 from custom_lib import sorted_walk, GeneratorBrake
 
 
@@ -20,9 +21,9 @@ hash_algo_map = {
 
 DEFAULT_ALGO = SHA256
 DEFAULT_BLOCK_SIZE = 4096
-TEMP_DIR = '.\\temp'
 
-def hash_file(file_path : str, hash_algo : str = DEFAULT_ALGO, block_size_bytes : int = DEFAULT_BLOCK_SIZE):
+def hash_file(file_path : str, hash_algo : str = DEFAULT_ALGO, 
+	block_size_bytes : int = DEFAULT_BLOCK_SIZE) -> str:
 	"""Takes the input file and generates a cryptographic hash using the specified cryptographic hash algorithm.
 
 	Args:
@@ -49,8 +50,8 @@ def hash_file(file_path : str, hash_algo : str = DEFAULT_ALGO, block_size_bytes 
 
 	return hash.hexdigest()
 
-def compare_checksum(file_1 : str, file_2 : str, hash_algo :str= DEFAULT_ALGO, \
-	block_size_bytes : int = DEFAULT_BLOCK_SIZE):
+def compare_checksum(file_1 : str, file_2 : str, hash_algo :str= DEFAULT_ALGO, 
+	block_size_bytes : int = DEFAULT_BLOCK_SIZE) -> bool:
 	"""Performs a checksum comparison for two input files, using the specified cryptographic hash algorithm.
 
 	Args:
@@ -68,8 +69,8 @@ def compare_checksum(file_1 : str, file_2 : str, hash_algo :str= DEFAULT_ALGO, \
 	hash_2 = hash_file(file_2, hash_algo, block_size_bytes)
 	return compare_hash(hash_1, hash_2)
 
-def compare_expected_checksum(file_path : str, expected_checksum : str, hash_algo :str= DEFAULT_ALGO, \
-	block_size_bytes : int = DEFAULT_BLOCK_SIZE):
+def compare_expected_checksum(file_path : str, expected_checksum : str, hash_algo :str= DEFAULT_ALGO, 
+	block_size_bytes : int = DEFAULT_BLOCK_SIZE) -> bool:
 	"""Performs an expected checksum comparison of an input file, using the specified cryptographic hash algorithm.
 
 	Args:
@@ -86,7 +87,7 @@ def compare_expected_checksum(file_path : str, expected_checksum : str, hash_alg
 	calculated_checksum = hash_file(file_path, hash_algo, block_size_bytes)
 	return compare_hash(calculated_checksum, expected_checksum)
 
-def compare_hash(hash_1 : str, hash_2 : str):
+def compare_hash(hash_1 : str, hash_2 : str) -> bool:
 	"""Checks if the two input hashes are equivalent.
 
 	Args:
@@ -102,16 +103,39 @@ def compare_hash(hash_1 : str, hash_2 : str):
 		
 	return ret_val
 
-def hash_walk(directory : str, hash_algo : str = DEFAULT_ALGO, block_size_bytes : int = DEFAULT_BLOCK_SIZE):
-		for root, dirs, files in sorted_walk(directory):
-			for name in files:
-				file_path = join(root, name)
-				file_checksum = hash_file(file_path, hash_algo, block_size_bytes)
-				yield (file_path, file_checksum)
+def hash_walk(directory : str, hash_algo : str = DEFAULT_ALGO, 
+	block_size_bytes : int = DEFAULT_BLOCK_SIZE) -> Tuple[str, str, int]:
+	"""Recursively calculates cryptographic hashes for files in the input directory.
 
-def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAULT_ALGO, \
+	Args:
+		directory (str): Specifies the directory.
+		hash_algo (str, optional): Specifies the cryptographic hash algorithm to use.
+			Options are [SHA1, SHA224, SHA256, SHA384, SHA512]. Defaults to DEFAULT_ALGO.
+		block_size_bytes (int, optional): Specifies the buffer size for file read.
+			 Defaults to DEFAULT_BLOCK_SIZE.
+
+	Yields:
+		Iterator[Tuple[str, str]]: Yeilds a tuple of a file path and the calculated hash.
+	"""
+	for root, dirs, files, directory_level in sorted_walk(directory):
+		for name in files:
+			file_path = join(root, name)
+			file_checksum = hash_file(file_path, hash_algo, block_size_bytes)
+			yield (file_path, file_checksum, directory_level)
+
+def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAULT_ALGO, 
 	block_size_bytes : int = DEFAULT_BLOCK_SIZE):
+	"""Recursively compares cryptographic checksums for the two input directories using \
+		the input hash algorithm.
 
+	Args:
+		directory_1 (str): Specifies the first directory.
+		directory_2 (str): Specifies the second directory.
+		hash_algo (str, optional): Specifies the cryptographic hash algorithm to use.
+			Options are [SHA1, SHA224, SHA256, SHA384, SHA512]. Defaults to DEFAULT_ALGO.
+		block_size_bytes (int, optional): Specifies the buffer size for file read.
+			Defaults to DEFAULT_BLOCK_SIZE.
+	"""
 	gbrake_1 = GeneratorBrake(hash_walk(directory_1, hash_algo, block_size_bytes))
 	gbrake_2 = GeneratorBrake(hash_walk(directory_2, hash_algo, block_size_bytes))
 	iter_1, iter_2 = gbrake_1.iter(), gbrake_2.iter()
@@ -119,6 +143,8 @@ def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAUL
 	for val_1, val_2 in zip_longest(iter_1, iter_2):
 		gbrake_1.start(), gbrake_2.start()
 		
+		#if (val_1 is None) and (val_2 is None):
+		#	break
 		if val_1 is None:
 			print("  + " + val_2[0])
 		elif val_2 is None:
@@ -130,7 +156,7 @@ def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAUL
 			if rel_1 == rel_2:
 				if val_1[1] != val_2[1]:
 					print("___ checksum failed  :  " + val_1[0] + ", " + val_2[0])
-			elif rel_1 > rel_2:
+			elif (rel_1 > rel_2) and (val_1[2] <= val_2[2]):
 				print("  + " + val_2[0])
 				gbrake_1.stop(val_1)
 			else:
