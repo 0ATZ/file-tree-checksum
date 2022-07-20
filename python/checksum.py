@@ -174,11 +174,3 @@ def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAUL
 				print("  - " + file_path_1)
 				gbrake_2.stop(v2)
 
-
-
-
-
-
-	
-
-

@@ -37,16 +37,12 @@ def main():
 
 	# check args for file and directory options
 	if (argv.file != None):
-		file_error = False
-		if not isfile(argv.file[0]):
-			print("ERROR: provided argument is not a file - " + argv.file[0])
-			file_error = True
-		
-		if not isfile(argv.file[1]):
-			print("ERROR: provided argument is not a file - " + argv.file[1])
-			file_error = True
+		error_list = [
+			(isfile(argv.file[0]), "ERROR: provided argument is not a file - " + argv.file[0]),
+			(isfile(argv.file[1]), "ERROR: provided argument is not a file - " + argv.file[1])
+		]
 
-		if file_error:
+		if cascade_error_handler(error_list):
 			exit()
 		
 		if compare_checksum(argv.file[0], argv.file[1], argv.algorithm, argv.block_size):
@@ -71,8 +67,4 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
-
-
-
 
