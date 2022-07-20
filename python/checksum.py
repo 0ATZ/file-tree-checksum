@@ -1,6 +1,6 @@
 from hashlib import sha1, sha224, sha256, sha384, sha512
 from itertools import zip_longest
-from os.path import join
+from os.path import join, dirname
 from typing import Tuple
 from custom_lib import sorted_walk, GeneratorBrake
 
@@ -115,13 +115,14 @@ def hash_walk(directory : str, hash_algo : str = DEFAULT_ALGO,
 			 Defaults to DEFAULT_BLOCK_SIZE.
 
 	Yields:
-		Iterator[Tuple[str, str]]: Yeilds a tuple of a file path and the calculated hash.
+		Iterator[Tuple[str, str, depth]]: Yeilds a tuple of a file path, the calculated hash,
+			and the recursion depth.
 	"""
-	for root, dirs, files, directory_level in sorted_walk(directory):
+	for root, dirs, files, depth in sorted_walk(directory):
 		for name in files:
 			file_path = join(root, name)
 			file_checksum = hash_file(file_path, hash_algo, block_size_bytes)
-			yield (file_path, file_checksum, directory_level)
+			yield (file_path, file_checksum, depth)
 
 def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAULT_ALGO, 
 	block_size_bytes : int = DEFAULT_BLOCK_SIZE):
@@ -139,31 +140,39 @@ def checksum_walk(directory_1 : str, directory_2 : str, hash_algo : str = DEFAUL
 	gbrake_1 = GeneratorBrake(hash_walk(directory_1, hash_algo, block_size_bytes))
 	gbrake_2 = GeneratorBrake(hash_walk(directory_2, hash_algo, block_size_bytes))
 	iter_1, iter_2 = gbrake_1.iter(), gbrake_2.iter()
-	
-	for val_1, val_2 in zip_longest(iter_1, iter_2):
+
+	for v1, v2 in zip_longest(iter_1, iter_2):
 		gbrake_1.start(), gbrake_2.start()
 		
-		#if (val_1 is None) and (val_2 is None):
-		#	break
-		if val_1 is None:
-			print("  + " + val_2[0])
-		elif val_2 is None:
-			print("  - " + val_1[0])
+		if v1 is None:
+			print("  + " + v2[0])
+		elif v2 is None:
+			print("  - " + v1[0])
 		else:
-			rel_1 = val_1[0][len(directory_1):] 
-			rel_2 = val_2[0][len(directory_2):]
+			(file_path_1, file_hash_1, dir_depth_1) = v1 
+			(file_path_2, file_hash_2, dir_depth_2) = v2 
+			
+			rel_path_1 = file_path_1[len(directory_1):]
+			rel_path_2 = file_path_2[len(directory_2):]
 
-			if rel_1 == rel_2:
-				if val_1[1] != val_2[1]:
-					print("___ checksum failed  :  " + val_1[0] + ", " + val_2[0])
-			elif (rel_1 > rel_2) and (val_1[2] <= val_2[2]):
-				print("  + " + val_2[0])
-				gbrake_1.stop(val_1)
+			if rel_path_1 == rel_path_2:
+				if file_hash_1 != file_hash_2:
+					print("___ checksum failed  :  " + file_path_1 + ", " + file_path_2)
+			elif dir_depth_1 != dir_depth_2:
+				dir_name_1 = dirname(file_path_1)[len(directory_1):]
+				dir_name_2 = dirname(file_path_2)[len(directory_2):] 
+				if dir_name_1 > dir_name_2:
+					print("  + " + file_path_2)
+					gbrake_1.stop(v1)
+				else:
+					print("  - " + file_path_1)
+					gbrake_2.stop(v2)
+			elif rel_path_1 > rel_path_2:
+				print("  + " + file_path_2)
+				gbrake_1.stop(v1)
 			else:
-				print("  - " + val_1[0])
-				gbrake_2.stop(val_2)
-
-
+				print("  - " + file_path_1)
+				gbrake_2.stop(v2)
 
 
 
